@@ -5,5 +5,14 @@ dist
 coverage
 .DS_Store
 *.log
-backend/dist
+backend-ts/dist
 frontend/dist
+
+# C# / .NET
+backend-csharp/bin/
+backend-csharp/obj/
+backend-csharp/.vs/
+backend-csharp/TestResults/
+*.user
+*.rsuser
+*.suo

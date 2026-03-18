@@ -59,7 +59,8 @@ Be prepared to:
 
 ## Project Structure
 
-- `backend/` NestJS API using `pg-mem` (in-memory SQL, no external DB service)
+- `backend-ts/` NestJS API using `pg-mem` (in-memory SQL, no external DB service)
+- `backend-csharp/` ASP.NET Core API (SQLite in-memory, no external DB service)
 - `frontend/` Vite + React app
 
 ## Local Run Instructions
@@ -67,24 +68,25 @@ Be prepared to:
 ### Prerequisites
 - Node.js 20+
 - npm 10+
-
-### Install dependencies
-From repository root:
-
-```bash
-npm install
-```
-
-(or, if needed)
-
-```bash
-npm run install:all
-```
+- .NET 10 SDK (only for `backend-csharp`)
 
 ### Run backend
 
+Option A: TypeScript/NestJS backend
+
 ```bash
-npm run dev:backend
+cd backend-ts
+npm install
+npm run dev
+```
+
+API will start at `http://localhost:3000`.
+
+Option B: C#/.NET backend
+
+```bash
+cd backend-csharp
+dotnet run
 ```
 
 API will start at `http://localhost:3000`.
@@ -93,7 +95,9 @@ API will start at `http://localhost:3000`.
 In a second terminal:
 
 ```bash
-npm run dev:frontend
+cd frontend
+npm install
+npm run dev
 ```
 
 UI will start at `http://localhost:5173`.
@@ -114,6 +118,8 @@ VITE_API_URL=http://localhost:3000
 - `GET /bio-pages/handle/:handle` - get a bio page by handle
 - `POST /bio-pages` - create a bio page
 - `PATCH /bio-pages/:id` - update a bio page
+
+Both backends (`backend-ts` and `backend-csharp`) expose this same API contract.
 
 Example `POST /bio-pages` payload:
 

@@ -7,36 +7,43 @@ The API includes basic functionality for creating, reading, and updating bio pag
 
 Your task is to design and implement a secure authentication and access control system around this API.
 
+> This take-home is intended to show how you think about security, tradeoffs, and implementation choices, not whether everything is fully complete. Focus on core concepts and clearly document assumptions or work intentionally deferred due to time.
+
 ### Starter API capabilities
-- Create bio pages
-- View bio pages
-- Update bio pages
+   - Create bio pages
+   - View bio pages
+   - Update bio pages
 
 ### Candidate objective
 Extend the system to support:
 1. Authentication
-- Users can sign up and log in
-- Any auth approach is acceptable (sessions, JWTs, etc.)
-- Only authenticated users can access protected functionality
+   - Users can sign up and log in
+   - Any auth approach is acceptable (sessions, JWTs, etc.)
+   - Only authenticated users can access protected functionality
 
 2. User-scoped bio pages
-- Each user automatically has a bio page
-- A user can view and edit their own bio page
+   - Each user automatically has a bio page
+   - A user can view and edit their own bio page
 
 3. Sharing between users
-- Users can share their bio page with other users, this allows them to edit the page
-- The public can view any bio page
-- Shared users can access only explicitly granted data
+   - Users can share their bio page with other users, this allows them to edit the page
+   - The public can view any bio page
+   - Shared users can access only explicitly granted data
 
 4. Authorization and access control
-- Prevent unauthorized access/modification of bio pages
-- Enforce permissions at API level
+   - Prevent unauthorized access/modification of bio pages
+   - Enforce permissions at API level
+
+### Backend choice
+- Implement your solution in **one** backend only: `backend-ts` **or** `backend-csharp`.
+- You are not expected to complete both backends in this take-home.
 
 ### Expectations
 - Working authentication flow
 - Clear access control enforcement
 - Reasonable handling of edge cases
 - Clean, understandable code
+- Short design write up 
 
 ### Time expectation
 - Please spend **2-4 hours maximum** on this assignment
@@ -45,17 +52,19 @@ Extend the system to support:
 
 ### Required deliverables from candidate
 1. Source code updates implementing authentication + authorization
+   - Submit changes for only one backend (`backend-ts` or `backend-csharp`)
 2. Short design write-up explaining:
-- Authentication approach
-- Authorization and sharing model
-- Tradeoffs and assumptions
-- Security concerns and mitigations
+   - Authentication approach
+   - Authorization and sharing model
+   - Tradeoffs and assumptions
+   - Security concerns and mitigations
 
 ### Follow-up interview
 Be prepared to:
 - Defend your project and key design choices
 - Walk us through your decision-making process
 - Explain tradeoffs, assumptions, and what you would improve with more time
+- Potentially write some code with the interviewer during follow up questions
 
 ## Project Structure
 

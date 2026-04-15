@@ -1,0 +1,19 @@
+{
+  "env": "production",
+  "port": 3000,
+  "logLevel": "warn",
+  "apiUrl": "https://api.example.com",
+  "database": {
+    "type": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "username": "user",
+    "password": "password",
+    "database": "prod_db"
+  },
+  "jwt": {
+    "accessTokenExpiresIn": "15m",
+    "refreshTokenExpiresIn": "7d",
+    "algorithm": "RS256"
+  }
+}

@@ -43,7 +43,7 @@ Extend the system to support:
 - Clear access control enforcement
 - Reasonable handling of edge cases
 - Clean, understandable code
-- Short design write up 
+- Short design write up
 
 ### Time expectation
 - Please spend **2-4 hours maximum** on this assignment
@@ -142,3 +142,10 @@ Example `POST /bio-pages` payload:
   ]
 }
 ```
+
+
+# Log
+Dockerfiles to containerize the applications
+JWT auth with RS256 asymmetric keys, configurable token expiry, refresh flow
+Limit list to 10 items to optimize performance
+SQL injection protection: param sanitization, escaping, input validation

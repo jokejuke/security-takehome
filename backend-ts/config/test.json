@@ -1,0 +1,14 @@
+{
+  "env": "test",
+  "port": 3000,
+  "logLevel": "error",
+  "apiUrl": "http://localhost:3000",
+  "database": {
+    "type": "pg-mem"
+  },
+  "jwt": {
+    "accessTokenExpiresIn": "1h",
+    "refreshTokenExpiresIn": "7d",
+    "algorithm": "RS256"
+  }
+}

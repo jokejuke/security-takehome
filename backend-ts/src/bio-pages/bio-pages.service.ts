@@ -17,11 +17,12 @@ type BioPageRow = {
 
 @Injectable()
 export class BioPagesService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService) { }
 
-  findAll(): BioPage[] {
+  findAll(limit: number = 10): BioPage[] {
     const rows = this.database.query<BioPageRow>(
-      'SELECT * FROM bio_pages ORDER BY created_at DESC;',
+      'SELECT * FROM bio_pages ORDER BY created_at DESC LIMIT $1;',
+      [limit],
     );
     return rows.map((row) => this.toBioPage(row));
   }

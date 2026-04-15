@@ -150,7 +150,7 @@ function App() {
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/sharing" element={<ProtectedRoute><SharingPage /></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
-        <Route path="/bio/:handle" element={<PublicBioPage />} />
+        <Route path="/bio/:handle" element={<ProtectedRoute><PublicBioPage /></ProtectedRoute>} />
         <Route path="/bio/:handle/edit" element={<ProtectedRoute><SharedBioEditPage /></ProtectedRoute>} />
       </Routes>
     </AuthContext.Provider>
@@ -399,10 +399,6 @@ function SignInPage() {
           <p style={{ marginTop: '1rem', textAlign: 'center' }}>
             Don't have an account? <Link to="/sign-up">Sign Up</Link>
           </p>
-          <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#f5f5f5', borderRadius: '4px', fontSize: '0.875rem' }}>
-            <strong>Test accounts:</strong> jane-sec, matt-devrel, priya-product<br />
-            <strong>Password:</strong> Test123456!@
-          </div>
         </section>
       </main>
     </div>
@@ -946,7 +942,8 @@ function PublicBioPage() {
       setBioPage(null);
       setSharingPerm(null);
 
-      const response = await fetch(`${API_URL}/bio-pages/handle/${handle}`);
+      const headers = tokens ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined;
+      const response = await fetch(`${API_URL}/bio-pages/handle/${handle}`, { headers });
       if (!response.ok) {
         setError('Bio page not found.');
         return;
@@ -1050,8 +1047,9 @@ function SharedBioEditPage() {
     async function load() {
       if (!tokens || !handle) return;
       try {
+        const authHeaders = { Authorization: `Bearer ${tokens.accessToken}` };
         const [bioRes, sharingRes] = await Promise.all([
-          fetch(`${API_URL}/bio-pages/handle/${handle}`),
+          fetch(`${API_URL}/bio-pages/handle/${handle}`, { headers: authHeaders }),
           fetch(`${API_URL}/sharing/received`, { headers: { Authorization: `Bearer ${tokens.accessToken}` } }),
         ]);
 

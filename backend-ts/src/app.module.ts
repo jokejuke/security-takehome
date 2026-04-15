@@ -14,6 +14,8 @@ export class AppModule implements OnModuleInit {
   constructor(private readonly database: DatabaseService) {}
 
   async onModuleInit() {
-    await this.database.seedTestData();
+    if (process.env.NODE_ENV !== 'production') {
+      await this.database.seedTestData();
+    }
   }
 }

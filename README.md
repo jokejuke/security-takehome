@@ -157,6 +157,7 @@ Exponential login backoff with Redis state tracking.
 # TODO
 
 ## High Security Priority
+Move token from session storage to http-only cookie.
 Add audit log for all sharing and user update actions done via sharing functionality and delete actions
 Request rate limiting
 Protected bio attributes (e.g. email)
@@ -170,4 +171,4 @@ Recuiter see CVs of all users (with no Sharing table involved)
 
 ## Lower Priority / Data Integrity
 UNIQUE constraint on sharing (owner_handle, shared_handle)
-Search by handle ()
+Search by handle

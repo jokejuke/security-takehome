@@ -4,6 +4,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { DatabaseService } from '../common/database.service';
 import { AuthService } from '../auth/auth.service';
 import { TokenPayload } from '../auth/auth.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 type UserRow = {
   id: string;
@@ -22,6 +23,7 @@ export class UsersController {
   constructor(
     private readonly database: DatabaseService,
     private readonly authService: AuthService,
+    private readonly auditLogsService: AuditLogsService,
   ) { }
 
   @Get()
@@ -55,12 +57,32 @@ export class UsersController {
     const user = (req as any).user as TokenPayload;
     const authHeader = req.headers.authorization;
     const token = authHeader?.substring(7) || '';
+    const bioPageRows = this.database.query<{ id: string; handle: string }>(
+      'SELECT id, handle FROM bio_pages WHERE user_id = $1;',
+      [user.sub],
+    );
+    const bioPage = bioPageRows[0] ?? null;
 
     const now = new Date().toISOString();
     this.database.exec(
       'UPDATE users SET deleted_at = $1 WHERE id = $2;',
       [now, user.sub],
     );
+
+    this.auditLogsService.create({
+      action: 'user.deleted',
+      actorUserId: user.sub,
+      actorHandle: user.handle,
+      subjectUserId: user.sub,
+      subjectHandle: user.handle,
+      resourceType: 'user',
+      resourceId: user.sub,
+      details: {
+        bioPageId: bioPage?.id ?? null,
+        bioPageHandle: bioPage?.handle ?? user.handle,
+        deletedAt: now,
+      },
+    });
 
     await this.authService.signOut(token);
   }

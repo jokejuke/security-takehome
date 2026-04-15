@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException, ForbiddenException } 
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../common/database.service';
 import { Sharing, GrantedField } from './sharing.types';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 type SharingRow = {
   id: string;
@@ -12,14 +13,24 @@ type SharingRow = {
   updated_at: string;
 };
 
+type GrantAccessInput = {
+  actorUserId: string;
+  ownerHandle: string;
+  sharedHandle: string;
+  grantedFields: GrantedField[];
+};
+
 @Injectable()
 export class SharingService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
-  grantAccess(ownerHandle: string, sharedHandle: string, grantedFields: GrantedField[]): Sharing {
+  grantAccess(input: GrantAccessInput): Sharing {
     const existing = this.database.query<SharingRow>(
       'SELECT id FROM sharing WHERE owner_handle = $1 AND shared_handle = $2;',
-      [ownerHandle, sharedHandle],
+      [input.ownerHandle, input.sharedHandle],
     );
 
     if (existing.length > 0) {
@@ -33,10 +44,24 @@ export class SharingService {
       `INSERT INTO sharing (id, owner_handle, shared_handle, granted_fields, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *;`,
-      [id, ownerHandle, sharedHandle, JSON.stringify(grantedFields), now, now],
+      [id, input.ownerHandle, input.sharedHandle, JSON.stringify(input.grantedFields), now, now],
     );
 
-    return this.toSharing(rows[0]);
+    const sharing = this.toSharing(rows[0]);
+
+    this.auditLogsService.create({
+      action: 'sharing.granted',
+      actorUserId: input.actorUserId,
+      actorHandle: input.ownerHandle,
+      subjectHandle: input.sharedHandle,
+      resourceType: 'sharing',
+      resourceId: sharing.id,
+      details: {
+        grantedFields: sharing.grantedFields,
+      },
+    });
+
+    return sharing;
   }
 
   findGranted(ownerHandle: string): Sharing[] {
@@ -63,7 +88,7 @@ export class SharingService {
     return rows.length > 0 ? this.toSharing(rows[0]) : null;
   }
 
-  revokeAccess(id: string, ownerHandle: string): void {
+  revokeAccess(id: string, actorUserId: string, ownerHandle: string): void {
     const rows = this.database.query<SharingRow>(
       'SELECT * FROM sharing WHERE id = $1;',
       [id],
@@ -77,7 +102,20 @@ export class SharingService {
       throw new ForbiddenException('You can only revoke your own grants');
     }
 
+    const sharing = this.toSharing(rows[0]);
     this.database.exec('DELETE FROM sharing WHERE id = $1;', [id]);
+
+    this.auditLogsService.create({
+      action: 'sharing.revoked',
+      actorUserId,
+      actorHandle: ownerHandle,
+      subjectHandle: sharing.sharedHandle,
+      resourceType: 'sharing',
+      resourceId: sharing.id,
+      details: {
+        grantedFields: sharing.grantedFields,
+      },
+    });
   }
 
   private toSharing(row: SharingRow): Sharing {

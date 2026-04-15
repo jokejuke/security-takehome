@@ -13,7 +13,12 @@ export class SharingController {
   @Post()
   grantAccess(@Body() dto: GrantAccessDto, @Req() req: Request) {
     const user = (req as any).user as TokenPayload;
-    return this.sharingService.grantAccess(user.handle, dto.sharedHandle, dto.grantedFields);
+    return this.sharingService.grantAccess({
+      actorUserId: user.sub,
+      ownerHandle: user.handle,
+      sharedHandle: dto.sharedHandle,
+      grantedFields: dto.grantedFields,
+    });
   }
 
   @Get('granted')
@@ -32,6 +37,6 @@ export class SharingController {
   @HttpCode(HttpStatus.NO_CONTENT)
   revokeAccess(@Param('id') id: string, @Req() req: Request) {
     const user = (req as any).user as TokenPayload;
-    this.sharingService.revokeAccess(id, user.handle);
+    this.sharingService.revokeAccess(id, user.sub, user.handle);
   }
 }

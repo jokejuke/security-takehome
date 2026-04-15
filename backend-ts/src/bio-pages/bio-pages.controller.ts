@@ -17,6 +17,7 @@ import { UpdateBioPageDto } from './dto/update-bio-page.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { TokenPayload } from '../auth/auth.types';
 import { SharingService } from '../sharing/sharing.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HANDLE_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
@@ -27,6 +28,7 @@ export class BioPagesController {
   constructor(
     private readonly bioPagesService: BioPagesService,
     private readonly sharingService: SharingService,
+    private readonly auditLogsService: AuditLogsService,
   ) { }
 
   @Get()
@@ -88,7 +90,22 @@ export class BioPagesController {
       throw new ForbiddenException(`You do not have permission to edit: ${unauthorized.join(', ')}`);
     }
 
-    return this.bioPagesService.update(id, payload);
+    const updatedBioPage = this.bioPagesService.update(id, payload);
+
+    this.auditLogsService.create({
+      action: 'bio_page.shared_update',
+      actorUserId: user.sub,
+      actorHandle: user.handle,
+      subjectUserId: bioPage.userId,
+      subjectHandle: bioPage.handle,
+      resourceType: 'bio_page',
+      resourceId: bioPage.id,
+      details: {
+        changedFields: requestedFields,
+      },
+    });
+
+    return updatedBioPage;
   }
 
   @Delete(':id')
@@ -103,6 +120,19 @@ export class BioPagesController {
       throw new ForbiddenException('You can only delete your own bio page');
     }
 
-    return this.bioPagesService.delete(id);
+    this.bioPagesService.delete(id);
+
+    this.auditLogsService.create({
+      action: 'bio_page.deleted',
+      actorUserId: user.sub,
+      actorHandle: user.handle,
+      subjectUserId: bioPage.userId,
+      subjectHandle: bioPage.handle,
+      resourceType: 'bio_page',
+      resourceId: bioPage.id,
+      details: {
+        deletedByOwner: true,
+      },
+    });
   }
 }

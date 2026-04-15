@@ -39,6 +39,19 @@ type Sharing = {
   updatedAt: string;
 };
 
+type AuditLog = {
+  id: string;
+  action: 'sharing.granted' | 'sharing.revoked' | 'bio_page.shared_update' | 'bio_page.deleted' | 'user.deleted';
+  actorUserId: string | null;
+  actorHandle: string | null;
+  subjectUserId: string | null;
+  subjectHandle: string | null;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+};
+
 type BioForm = {
   displayName: string;
   bio: string;
@@ -64,6 +77,36 @@ function useAuth() {
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+function formatAuditLog(log: AuditLog, currentHandle: string | null): string {
+  const actor = log.actorHandle ? `@${log.actorHandle}` : 'Someone';
+  const subject = log.subjectHandle ? `@${log.subjectHandle}` : 'a user';
+  const fields = Array.isArray(log.details.grantedFields)
+    ? (log.details.grantedFields as string[]).join(', ')
+    : '';
+  const changedFields = Array.isArray(log.details.changedFields)
+    ? (log.details.changedFields as string[]).join(', ')
+    : '';
+
+  switch (log.action) {
+    case 'sharing.granted':
+      return `${actor} granted ${subject} access${fields ? ` to ${fields}` : ''}.`;
+    case 'sharing.revoked':
+      return `${actor} revoked ${subject}'s shared access.`;
+    case 'bio_page.shared_update':
+      return actor === `@${currentHandle}`
+        ? `You updated ${subject}'s bio${changedFields ? `: ${changedFields}` : ''}.`
+        : `${actor} updated ${subject}'s bio${changedFields ? `: ${changedFields}` : ''}.`;
+    case 'bio_page.deleted':
+      return `${actor} deleted ${subject}'s bio page.`;
+    case 'user.deleted':
+      return actor === `@${currentHandle}`
+        ? 'You deleted your account.'
+        : `${actor} deleted their account.`;
+    default:
+      return 'Audit event recorded.';
+  }
+}
 
 function App() {
   const [tokens, setTokens] = useState<AuthTokens | null>(() => {
@@ -696,6 +739,7 @@ function SharingPage() {
   const { tokens, handle } = useAuth();
   const [granted, setGranted] = useState<Sharing[]>([]);
   const [received, setReceived] = useState<Sharing[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [sharedHandle, setSharedHandle] = useState('');
   const [grantedFields, setGrantedFields] = useState<Set<string>>(
     new Set(['bio', 'display_name', 'links']),
@@ -719,9 +763,16 @@ function SharingPage() {
     if (res.ok) setReceived(await res.json() as Sharing[]);
   }
 
+  async function loadAuditLogs() {
+    if (!tokens) return;
+    const res = await fetch(`${API_URL}/audit-logs?limit=25`, { headers: authHeader() });
+    if (res.ok) setAuditLogs(await res.json() as AuditLog[]);
+  }
+
   useEffect(() => {
     loadGranted().catch(() => {});
     loadReceived().catch(() => {});
+    loadAuditLogs().catch(() => {});
   }, [tokens]);
 
   function toggleField(field: string) {
@@ -750,11 +801,13 @@ function SharingPage() {
     setSharedHandle('');
     setMessage('Access granted.');
     loadGranted().catch(() => {});
+    loadAuditLogs().catch(() => {});
   }
 
   async function handleRevoke(id: string) {
     await fetch(`${API_URL}/sharing/${id}`, { method: 'DELETE', headers: authHeader() });
     loadGranted().catch(() => {});
+    loadAuditLogs().catch(() => {});
   }
 
   return (
@@ -846,6 +899,29 @@ function SharingPage() {
               </div>
             </section>
           )}
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Audit Log</h2>
+              <button type="button" className="secondary" onClick={() => loadAuditLogs().catch(() => {})}>
+                Refresh
+              </button>
+            </div>
+            {auditLogs.length === 0 ? (
+              <p style={{ color: '#666' }}>No audit events yet.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.65rem', marginTop: '0.75rem' }}>
+                {auditLogs.map((log) => (
+                  <div key={log.id} style={{ padding: '0.75rem', border: '1px solid #ddd', borderRadius: '8px', background: '#fff' }}>
+                    <div style={{ fontWeight: 600 }}>{formatAuditLog(log, handle)}</div>
+                    <div style={{ marginTop: '0.2rem', color: '#666', fontSize: '0.8rem' }}>
+                      {new Date(log.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </main>
     </div>

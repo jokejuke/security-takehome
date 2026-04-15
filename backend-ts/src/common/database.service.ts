@@ -72,14 +72,31 @@ export class DatabaseService {
       );
     `;
 
+    const createAuditLogs = `
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        action TEXT NOT NULL,
+        actor_user_id TEXT,
+        actor_handle TEXT,
+        subject_user_id TEXT,
+        subject_handle TEXT,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT,
+        details_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `;
+
     if (this.dbType === 'sqlite' && this.sqliteDb) {
       this.sqliteDb.exec(createUsers);
       this.sqliteDb.exec(createBioPages);
       this.sqliteDb.exec(createSharing);
+      this.sqliteDb.exec(createAuditLogs);
     } else if (this.pgDb) {
       this.pgDb.public.none(createUsers.replace('IF NOT EXISTS ', ''));
       this.pgDb.public.none(createBioPages.replace('IF NOT EXISTS ', ''));
       this.pgDb.public.none(createSharing.replace(/IF NOT EXISTS |UNIQUE/g, ''));
+      this.pgDb.public.none(createAuditLogs.replace('IF NOT EXISTS ', ''));
     }
   }
 

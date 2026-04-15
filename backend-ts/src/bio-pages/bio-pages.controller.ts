@@ -22,6 +22,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 const HANDLE_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
 @Controller('bio-pages')
+@UseGuards(AuthGuard)
 export class BioPagesController {
   constructor(
     private readonly bioPagesService: BioPagesService,
@@ -38,7 +39,6 @@ export class BioPagesController {
   }
 
   @Get('me')
-  @UseGuards(AuthGuard)
   findMine(@Req() req: Request) {
     const user = (req as any).user as TokenPayload;
     return this.bioPagesService.findByUserId(user.sub);
@@ -61,7 +61,6 @@ export class BioPagesController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard)
   update(@Param('id') id: string, @Body() payload: UpdateBioPageDto, @Req() req: Request) {
     if (!UUID_REGEX.test(id)) {
       throw new BadRequestException('Invalid ID format');
@@ -93,7 +92,6 @@ export class BioPagesController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard)
   delete(@Param('id') id: string, @Req() req: Request) {
     if (!UUID_REGEX.test(id)) {
       throw new BadRequestException('Invalid ID format');

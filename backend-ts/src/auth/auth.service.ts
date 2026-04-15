@@ -1,5 +1,7 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { AuthTokens, JwtConfig, TokenPayload, User } from './auth.types';
 import { TokenBlacklistService } from './token-blacklist.service';
+import { LoginThrottleService } from './login-throttle.service';
 
 type UserRow = {
   id: string;
@@ -36,6 +39,7 @@ export class AuthService {
   constructor(
     private readonly database: DatabaseService,
     private readonly tokenBlacklist: TokenBlacklistService,
+    private readonly loginThrottle: LoginThrottleService,
   ) {
     const env = process.env.NODE_ENV || 'development';
     const configPath = join(__dirname, '..', '..', 'config', `${env}.json`);
@@ -80,12 +84,22 @@ export class AuthService {
   }
 
   async signIn(dto: SignInDto): Promise<AuthTokens> {
+    const waitMs = await this.loginThrottle.getWaitTime(dto.handle);
+    if (waitMs > 0) {
+      const retryAfter = Math.ceil(waitMs / 1000);
+      throw new HttpException(
+        { statusCode: HttpStatus.TOO_MANY_REQUESTS, message: 'Too many login attempts. Try again later.', retryAfter },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const rows = this.database.query<UserRow>(
       'SELECT * FROM users WHERE handle = $1;',
       [dto.handle],
     );
     const user = rows[0];
     if (!user) {
+      await this.loginThrottle.recordFailure(dto.handle);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -95,9 +109,11 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
     if (!isPasswordValid) {
+      await this.loginThrottle.recordFailure(dto.handle);
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.loginThrottle.clearFailures(dto.handle);
     return this.generateToken({ id: user.id, handle: user.handle });
   }
 

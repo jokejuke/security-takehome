@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../common/database.service';
 import { Sharing, GrantedField } from './sharing.types';
@@ -74,7 +74,7 @@ export class SharingService {
     }
 
     if (rows[0].owner_handle !== ownerHandle) {
-      throw new ConflictException('You can only revoke your own grants');
+      throw new ForbiddenException('You can only revoke your own grants');
     }
 
     this.database.exec('DELETE FROM sharing WHERE id = $1;', [id]);

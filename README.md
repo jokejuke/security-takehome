@@ -145,24 +145,29 @@ Example `POST /bio-pages` payload:
 
 
 # Log
-Dockerfiles to containerize the applications. Different configs for dev, test and prod (CI/CD)
-JWT auth with RS256 asymmetric keys, configurable token expiry.
-Limit list to 10 items to optimize performance by default
-SQL injection protection: param sanitization, escaping, input validation
-Auth uses handle instead of email; SOC2 password policy (12+ chars, mixed case, num, special)
-Sharing: users grant edit access with granular field permissions (bio/name/links)
-Soft delete with deleted_at; token blacklist replaces refresh tokens
-Map -> Redis for token blacklist storage
-Delete endpoint for bio pages. Confirmation level. (SOC2 compliance and less load on Support team)
-
+Multi-env Docker containers for CI/CD (dev/test/prod).
+RS256 JWT auth with asymmetric keys and configurable expiry.
+Pagination with parameterized queries; SQL injection prevention.
+Handle-based auth with SOC2 password policy (12+ chars, complexity).
+Field-level sharing permissions (bio, displayName, links).
+Soft-delete + Redis token blacklist replacing refresh tokens.
+Account deletion with confirmation (SOC2 compliance).
+Exponential login backoff with Redis state tracking.
 
 # TODO
+
+## High Security Priority
 Add audit log for all sharing and user update actions done via sharing functionality and delete actions
 Request rate limiting
-Permanent deletion workflow
 Protected bio attributes (e.g. email)
+Email verification flow: as extra step after user sign-up. Should not block user signup process for better conversion.
+
+## Medium Priority
+Refresh-tokens
+Permanent deletion workflow
 Admin / Recuiter Roles
 Recuiter see CVs of all users (with no Sharing table involved)
-Refresh-tokens
-Search by handle ()
+
+## Lower Priority / Data Integrity
 UNIQUE constraint on sharing (owner_handle, shared_handle)
+Search by handle ()

@@ -147,5 +147,20 @@ Example `POST /bio-pages` payload:
 # Log
 Dockerfiles to containerize the applications
 JWT auth with RS256 asymmetric keys, configurable token expiry, refresh flow
-Limit list to 10 items to optimize performance
+Limit list to 10 items to optimize performance by default
 SQL injection protection: param sanitization, escaping, input validation
+Auth uses handle instead of email; SOC2 password policy (12+ chars, mixed case, num, special)
+Sharing: users grant edit access with granular field permissions (bio/name/links)
+Soft delete with deleted_at; token blacklist replaces refresh tokens
+Redis for token blacklist storage
+
+
+# TODO
+Request rate limiting
+Admin / Recuiter Roles
+Default Sharing profile settings for user (for recruiters for ex.)
+Recuiter see CVs of all users (with no Sharing table involved)
+Audit log for all actions
+Refresh-tokens
+Search by handle
+UNIQUE constraint on sharing (owner_handle, shared_handle)

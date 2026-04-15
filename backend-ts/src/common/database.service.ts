@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import * as bcrypt from 'bcrypt';
 
 interface DatabaseConfig {
   database: {
@@ -18,6 +19,7 @@ export class DatabaseService {
   private readonly pgDb: ReturnType<typeof newDb> | null = null;
   private readonly sqliteDb: Database.Database | null = null;
   private readonly dbType: 'sqlite' | 'postgres' | 'pg-mem';
+  private initialized = false;
 
   constructor() {
     const env = process.env.NODE_ENV || 'development';
@@ -27,34 +29,69 @@ export class DatabaseService {
 
     if (this.dbType === 'sqlite') {
       this.sqliteDb = new Database(config.database.path || ':memory:');
-      this.sqliteDb.exec(`
-        CREATE TABLE IF NOT EXISTS bio_pages (
-          id TEXT PRIMARY KEY,
-          handle TEXT UNIQUE NOT NULL,
-          display_name TEXT NOT NULL,
-          bio TEXT NOT NULL,
-          links_json TEXT NOT NULL DEFAULT '[]',
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-      `);
     } else if (this.dbType === 'pg-mem' || this.dbType === 'postgres') {
       this.pgDb = newDb();
-      this.pgDb.public.none(`
-        CREATE TABLE bio_pages (
-          id TEXT PRIMARY KEY,
-          handle TEXT UNIQUE NOT NULL,
-          display_name TEXT NOT NULL,
-          bio TEXT NOT NULL,
-          links_json TEXT NOT NULL DEFAULT '[]',
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-      `);
     }
 
+    this.initSchema();
+  }
+
+  private initSchema(): void {
+    const createUsers = `
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        handle TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `;
+
+    const createBioPages = `
+      CREATE TABLE IF NOT EXISTS bio_pages (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        handle TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        bio TEXT NOT NULL,
+        links_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `;
+
+    const createSharing = `
+      CREATE TABLE IF NOT EXISTS sharing (
+        id TEXT PRIMARY KEY,
+        owner_handle TEXT NOT NULL,
+        shared_handle TEXT NOT NULL,
+        granted_fields TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `;
+
+    if (this.dbType === 'sqlite' && this.sqliteDb) {
+      this.sqliteDb.exec(createUsers);
+      this.sqliteDb.exec(createBioPages);
+      this.sqliteDb.exec(createSharing);
+    } else if (this.pgDb) {
+      this.pgDb.public.none(createUsers.replace('IF NOT EXISTS ', ''));
+      this.pgDb.public.none(createBioPages.replace('IF NOT EXISTS ', ''));
+      this.pgDb.public.none(createSharing.replace(/IF NOT EXISTS |UNIQUE/g, ''));
+    }
+  }
+
+  async seedTestData(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+
     const now = new Date().toISOString();
-    const seedRows = [
+    const testPassword = 'Test123456!@';
+    const passwordHash = await bcrypt.hash(testPassword, 12);
+
+    const seedUsers = [
       {
         id: randomUUID(),
         handle: 'jane-sec',
@@ -87,11 +124,17 @@ export class DatabaseService {
       },
     ];
 
-    for (const row of seedRows) {
+    for (const user of seedUsers) {
       this.exec(
-        `INSERT INTO bio_pages (id, handle, display_name, bio, links_json, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7);`,
-        [row.id, row.handle, row.displayName, row.bio, row.linksJson, now, now],
+        `INSERT INTO users (id, handle, password_hash, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [user.id, user.handle, passwordHash, now, now],
+      );
+
+      this.exec(
+        `INSERT INTO bio_pages (id, user_id, handle, display_name, bio, links_json, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+        [randomUUID(), user.id, user.handle, user.displayName, user.bio, user.linksJson, now, now],
       );
     }
   }

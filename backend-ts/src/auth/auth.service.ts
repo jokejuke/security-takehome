@@ -11,22 +11,16 @@ import * as jwt from 'jsonwebtoken';
 import { DatabaseService } from '../common/database.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
-import { AuthTokens, JwtConfig, TokenPayload, User, RefreshToken } from './auth.types';
+import { AuthTokens, JwtConfig, TokenPayload, User } from './auth.types';
+import { TokenBlacklistService } from './token-blacklist.service';
 
 type UserRow = {
   id: string;
-  email: string;
+  handle: string;
   password_hash: string;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
-};
-
-type RefreshTokenRow = {
-  id: string;
-  user_id: string;
-  token: string;
-  expires_at: string;
-  created_at: string;
 };
 
 interface AppConfig {
@@ -39,7 +33,10 @@ export class AuthService {
   private readonly privateKey: string;
   private readonly publicKey: string;
 
-  constructor(private readonly database: DatabaseService) {
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly tokenBlacklist: TokenBlacklistService,
+  ) {
     const env = process.env.NODE_ENV || 'development';
     const configPath = join(__dirname, '..', '..', 'config', `${env}.json`);
     this.config = JSON.parse(readFileSync(configPath, 'utf-8'));
@@ -47,62 +44,53 @@ export class AuthService {
     const keysDir = join(__dirname, '..', '..', 'keys');
     this.privateKey = readFileSync(join(keysDir, 'private.pem'), 'utf-8');
     this.publicKey = readFileSync(join(keysDir, 'public.pem'), 'utf-8');
-
-    this.initTables();
   }
 
-  private initTables(): void {
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
-
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS refresh_tokens (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `);
-  }
-
-  async signUp(dto: SignUpDto): Promise<AuthTokens> {
+  async signUp(dto: SignUpDto): Promise<{ userId: string }> {
     const existingUser = this.database.query<UserRow>(
-      'SELECT id FROM users WHERE email = $1;',
-      [dto.email],
+      'SELECT id FROM users WHERE handle = $1;',
+      [dto.handle],
     );
     if (existingUser.length > 0) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('Handle already registered');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const id = randomUUID();
+    const userId = randomUUID();
+    const bioPageId = randomUUID();
     const now = new Date().toISOString();
 
     this.database.exec(
-      `INSERT INTO users (id, email, password_hash, created_at, updated_at)
+      `INSERT INTO users (id, handle, password_hash, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5);`,
-      [id, dto.email, passwordHash, now, now],
+      [userId, dto.handle, passwordHash, now, now],
     );
 
-    return this.generateTokens({ id, email: dto.email });
+    const displayName = dto.displayName || dto.handle;
+    const bio = dto.bio || '';
+    const linksJson = JSON.stringify(dto.links || []);
+
+    this.database.exec(
+      `INSERT INTO bio_pages (id, user_id, handle, display_name, bio, links_json, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+      [bioPageId, userId, dto.handle, displayName, bio, linksJson, now, now],
+    );
+
+    return { userId };
   }
 
   async signIn(dto: SignInDto): Promise<AuthTokens> {
     const rows = this.database.query<UserRow>(
-      'SELECT * FROM users WHERE email = $1;',
-      [dto.email],
+      'SELECT * FROM users WHERE handle = $1;',
+      [dto.handle],
     );
     const user = rows[0];
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.deleted_at) {
+      throw new UnauthorizedException('Account has been deleted');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
@@ -110,56 +98,29 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.generateTokens({ id: user.id, email: user.email });
+    return this.generateToken({ id: user.id, handle: user.handle });
   }
 
-  async refresh(refreshToken: string): Promise<AuthTokens> {
-    let payload: TokenPayload;
+
+  async signOut(accessToken: string): Promise<void> {
     try {
-      payload = jwt.verify(refreshToken, this.publicKey, {
+      const payload = jwt.verify(accessToken, this.publicKey, {
         algorithms: [this.config.jwt.algorithm],
       }) as TokenPayload;
+
+      if (payload.exp) {
+        await this.tokenBlacklist.addToken(accessToken, payload.exp * 1000);
+      }
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      // Token already invalid, nothing to blacklist
     }
-
-    if (payload.type !== 'refresh') {
-      throw new UnauthorizedException('Invalid token type');
-    }
-
-    const tokenRows = this.database.query<RefreshTokenRow>(
-      'SELECT * FROM refresh_tokens WHERE token = $1;',
-      [refreshToken],
-    );
-    const storedToken = tokenRows[0];
-    if (!storedToken) {
-      throw new UnauthorizedException('Refresh token not found');
-    }
-
-    if (new Date(storedToken.expires_at) < new Date()) {
-      this.database.exec('DELETE FROM refresh_tokens WHERE id = $1;', [storedToken.id]);
-      throw new UnauthorizedException('Refresh token expired');
-    }
-
-    this.database.exec('DELETE FROM refresh_tokens WHERE id = $1;', [storedToken.id]);
-
-    const userRows = this.database.query<UserRow>(
-      'SELECT * FROM users WHERE id = $1;',
-      [payload.sub],
-    );
-    const user = userRows[0];
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    return this.generateTokens({ id: user.id, email: user.email });
   }
 
-  async signOut(refreshToken: string): Promise<void> {
-    this.database.exec('DELETE FROM refresh_tokens WHERE token = $1;', [refreshToken]);
-  }
+  async verifyAccessToken(token: string): Promise<TokenPayload> {
+    if (await this.tokenBlacklist.isBlacklisted(token)) {
+      throw new UnauthorizedException('Token has been revoked');
+    }
 
-  verifyAccessToken(token: string): TokenPayload {
     try {
       const payload = jwt.verify(token, this.publicKey, {
         algorithms: [this.config.jwt.algorithm],
@@ -170,7 +131,8 @@ export class AuthService {
       }
 
       return payload;
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Invalid access token');
     }
   }
@@ -179,17 +141,11 @@ export class AuthService {
     return this.publicKey;
   }
 
-  private generateTokens(user: { id: string; email: string }): AuthTokens {
+  private generateToken(user: { id: string; handle: string }): AuthTokens {
     const accessPayload: TokenPayload = {
       sub: user.id,
-      email: user.email,
+      handle: user.handle,
       type: 'access',
-    };
-
-    const refreshPayload: TokenPayload = {
-      sub: user.id,
-      email: user.email,
-      type: 'refresh',
     };
 
     const accessToken = jwt.sign(accessPayload, this.privateKey, {
@@ -197,53 +153,10 @@ export class AuthService {
       expiresIn: this.config.jwt.accessTokenExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
-    const refreshToken = jwt.sign(refreshPayload, this.privateKey, {
-      algorithm: this.config.jwt.algorithm,
-      expiresIn: this.config.jwt.refreshTokenExpiresIn as jwt.SignOptions['expiresIn'],
-    });
-
-    const refreshExpiresAt = this.calculateExpiry(this.config.jwt.refreshTokenExpiresIn);
-    const tokenId = randomUUID();
-    const now = new Date().toISOString();
-
-    this.database.exec(
-      `INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at)
-       VALUES ($1, $2, $3, $4, $5);`,
-      [tokenId, user.id, refreshToken, refreshExpiresAt, now],
-    );
-
     return {
       accessToken,
-      refreshToken,
       expiresIn: this.config.jwt.accessTokenExpiresIn,
     };
   }
 
-  private calculateExpiry(duration: string): string {
-    const now = new Date();
-    const match = duration.match(/^(\d+)([smhd])$/);
-    if (!match) {
-      throw new Error(`Invalid duration format: ${duration}`);
-    }
-
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
-
-    switch (unit) {
-      case 's':
-        now.setSeconds(now.getSeconds() + value);
-        break;
-      case 'm':
-        now.setMinutes(now.getMinutes() + value);
-        break;
-      case 'h':
-        now.setHours(now.getHours() + value);
-        break;
-      case 'd':
-        now.setDate(now.getDate() + value);
-        break;
-    }
-
-    return now.toISOString();
-  }
 }

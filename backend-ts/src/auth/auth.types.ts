@@ -1,28 +1,20 @@
 export interface User {
   id: string;
-  email: string;
+  handle: string;
   passwordHash: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface RefreshToken {
-  id: string;
-  userId: string;
-  token: string;
-  expiresAt: string;
-  createdAt: string;
-}
-
 export interface TokenPayload {
   sub: string;
-  email: string;
-  type: 'access' | 'refresh';
+  handle: string;
+  type: 'access';
+  exp?: number;
 }
 
 export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
   expiresIn: string;
 }
 

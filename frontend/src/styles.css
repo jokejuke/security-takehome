@@ -298,6 +298,115 @@ textarea {
   color: var(--ink-500);
 }
 
+/* ── Danger zone ─────────────────────────────────────────────────────────── */
+
+.danger-divider {
+  border: none;
+  border-top: 1px solid #fca5a5;
+  margin: 0.5rem 0 0;
+}
+
+.danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0 0.25rem;
+}
+
+.danger-zone p {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-500);
+}
+
+.btn-danger {
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: var(--danger);
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: 120ms ease;
+  flex-shrink: 0;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 33, 61, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--danger);
+}
+
+.modal-body {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.modal-input {
+  width: 100%;
+  font: inherit;
+  border: 1.5px solid #fca5a5;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.7rem;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
 @media (max-width: 760px) {
   .topbar {
     flex-wrap: wrap;

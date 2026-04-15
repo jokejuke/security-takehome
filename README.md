@@ -145,22 +145,24 @@ Example `POST /bio-pages` payload:
 
 
 # Log
-Dockerfiles to containerize the applications
-JWT auth with RS256 asymmetric keys, configurable token expiry, refresh flow
+Dockerfiles to containerize the applications. Different configs for dev, test and prod (CI/CD)
+JWT auth with RS256 asymmetric keys, configurable token expiry.
 Limit list to 10 items to optimize performance by default
 SQL injection protection: param sanitization, escaping, input validation
 Auth uses handle instead of email; SOC2 password policy (12+ chars, mixed case, num, special)
 Sharing: users grant edit access with granular field permissions (bio/name/links)
 Soft delete with deleted_at; token blacklist replaces refresh tokens
-Redis for token blacklist storage
+Map -> Redis for token blacklist storage
+Delete endpoint for bio pages. Confirmation level. (SOC2 compliance and less load on Support team)
 
 
 # TODO
+Add audit log for all sharing and user update actions done via sharing functionality and delete actions
 Request rate limiting
+Permanent deletion workflow
+Protected bio attributes (e.g. email)
 Admin / Recuiter Roles
-Default Sharing profile settings for user (for recruiters for ex.)
 Recuiter see CVs of all users (with no Sharing table involved)
-Audit log for all actions
 Refresh-tokens
-Search by handle
+Search by handle ()
 UNIQUE constraint on sharing (owner_handle, shared_handle)

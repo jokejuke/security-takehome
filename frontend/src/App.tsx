@@ -366,12 +366,71 @@ function SignInPage() {
   );
 }
 
+function DeleteAccountModal({
+  handle,
+  onConfirm,
+  onCancel,
+}: {
+  handle: string;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const matches = typed === handle;
+
+  async function handleDelete() {
+    if (!matches || deleting) return;
+    setDeleting(true);
+    await onConfirm();
+    setDeleting(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <h3 className="modal-title">Delete Account</h3>
+        <p className="modal-body">
+          This action is <strong>permanent and cannot be undone.</strong> Your account and bio page
+          will be permanently deleted.
+        </p>
+        <p className="modal-body">
+          Type <strong>@{handle}</strong> to confirm:
+        </p>
+        <input
+          className="modal-input"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onPaste={(e) => e.preventDefault()}
+          placeholder={handle}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-danger"
+            disabled={!matches || deleting}
+            onClick={handleDelete}
+          >
+            {deleting ? 'Deleting…' : 'Delete my account'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DashboardPage() {
-  const { tokens, handle } = useAuth();
+  const { tokens, handle, logout } = useAuth();
   const [bioPage, setBioPage] = useState<BioPage | null>(null);
   const [form, setForm] = useState<BioForm>({ displayName: '', bio: '', links: [] });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -451,6 +510,16 @@ function DashboardPage() {
     }));
   }
 
+  async function handleDeleteAccount() {
+    if (!tokens) return;
+    await fetch(`${API_URL}/users/me`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+    logout();
+    navigate('/');
+  }
+
   if (loading) {
     return (
       <div className="app-shell">
@@ -520,8 +589,27 @@ function DashboardPage() {
             </div>
             <button type="submit" className="cta">Save Changes</button>
           </form>
+
+          <hr className="danger-divider" />
+          <div className="danger-zone">
+            <div>
+              <strong>Delete account</strong>
+              <p>Permanently delete your account and bio page. This cannot be undone.</p>
+            </div>
+            <button type="button" className="btn-danger" onClick={() => setShowDeleteModal(true)}>
+              Delete account
+            </button>
+          </div>
         </section>
       </main>
+
+      {showDeleteModal && handle && (
+        <DeleteAccountModal
+          handle={handle}
+          onConfirm={handleDeleteAccount}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
     </div>
   );
 }

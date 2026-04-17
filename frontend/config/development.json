@@ -1,5 +1,0 @@
-{
-  "env": "development",
-  "apiBaseUrl": "http://localhost:3000",
-  "debugMode": true
-}

@@ -5,7 +5,6 @@ export interface BioLink {
 
 export interface BioPage {
   id: string;
-  userId: string;
   handle: string;
   displayName: string;
   bio: string;

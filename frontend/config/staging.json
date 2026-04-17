@@ -1,5 +1,0 @@
-{
-  "env": "staging",
-  "apiBaseUrl": "https://staging-api.example.com",
-  "debugMode": true
-}

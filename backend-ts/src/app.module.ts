@@ -1,21 +1,7 @@
-import { Module, OnModuleInit } from '@nestjs/common';
-import { DatabaseModule } from './common/database.module';
+import { Module } from '@nestjs/common';
 import { BioPagesModule } from './bio-pages/bio-pages.module';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { SharingModule } from './sharing/sharing.module';
-import { AuditLogsModule } from './audit-logs/audit-logs.module';
-import { DatabaseService } from './common/database.service';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, BioPagesModule, UsersModule, SharingModule, AuditLogsModule],
+  imports: [BioPagesModule],
 })
-export class AppModule implements OnModuleInit {
-  constructor(private readonly database: DatabaseService) {}
-
-  async onModuleInit() {
-    if (process.env.NODE_ENV !== 'production') {
-      await this.database.seedTestData();
-    }
-  }
-}
+export class AppModule {}

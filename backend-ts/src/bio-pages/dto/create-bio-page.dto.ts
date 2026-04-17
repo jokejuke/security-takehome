@@ -6,6 +6,7 @@ import {
   IsString,
   IsUrl,
   Length,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 
@@ -21,6 +22,9 @@ class BioLinkDto {
 export class CreateBioPageDto {
   @IsString()
   @Length(2, 30)
+  @Matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/, {
+    message: 'Handle must contain only lowercase letters, numbers, and hyphens',
+  })
   handle!: string;
 
   @IsString()

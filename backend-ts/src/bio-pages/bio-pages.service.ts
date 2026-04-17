@@ -7,6 +7,7 @@ import { DatabaseService } from '../common/database.service';
 
 type BioPageRow = {
   id: string;
+  user_id: string;
   handle: string;
   display_name: string;
   bio: string;
@@ -17,11 +18,12 @@ type BioPageRow = {
 
 @Injectable()
 export class BioPagesService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService) { }
 
-  findAll(): BioPage[] {
+  findAll(limit: number = 10): BioPage[] {
     const rows = this.database.query<BioPageRow>(
-      'SELECT * FROM bio_pages ORDER BY created_at DESC;',
+      'SELECT * FROM bio_pages ORDER BY created_at DESC LIMIT $1;',
+      [limit],
     );
     return rows.map((row) => this.toBioPage(row));
   }
@@ -44,6 +46,21 @@ export class BioPagesService {
       throw new NotFoundException('Bio page not found');
     }
     return this.toBioPage(row);
+  }
+
+  findByUserId(userId: string): BioPage {
+    const rows = this.database.query<BioPageRow>('SELECT * FROM bio_pages WHERE user_id = $1;', [
+      userId,
+    ]);
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException('Bio page not found');
+    }
+    return this.toBioPage(row);
+  }
+
+  delete(id: string): void {
+    this.database.exec('DELETE FROM bio_pages WHERE id = $1;', [id]);
   }
 
   create(payload: CreateBioPageDto): BioPage {
@@ -112,6 +129,7 @@ export class BioPagesService {
   private toBioPage(row: BioPageRow): BioPage {
     return {
       id: row.id,
+      userId: row.user_id,
       handle: row.handle,
       displayName: row.display_name,
       bio: row.bio,

@@ -55,8 +55,10 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteMe(@Req() req: Request) {
     const user = (req as any).user as TokenPayload;
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.substring(7) || '';
+    const accessToken = req.headers.authorization?.substring(7) || '';
+    // Client should send its refresh token here so both tokens are revoked
+    const refreshToken = req.headers['x-refresh-token'] as string | undefined;
+
     const bioPageRows = this.database.query<{ id: string; handle: string }>(
       'SELECT id, handle FROM bio_pages WHERE user_id = $1;',
       [user.sub],
@@ -84,6 +86,6 @@ export class UsersController {
       },
     });
 
-    await this.authService.signOut(token);
+    await this.authService.signOut(accessToken, refreshToken);
   }
 }

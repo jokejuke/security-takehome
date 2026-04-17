@@ -153,12 +153,14 @@ Field-level sharing permissions (bio, displayName, links).
 Soft-delete + Redis token blacklist replacing refresh tokens.
 Account deletion with confirmation (SOC2 compliance).
 Exponential login backoff with Redis state tracking.
+Add audit log for all sharing and user update actions done via sharing functionality and delete actions
 
 # TODO
 
 ## High Security Priority
+CSRF protection
 Move token from session storage to http-only cookie.
-Add audit log for all sharing and user update actions done via sharing functionality and delete actions
+
 Request rate limiting
 Protected bio attributes (e.g. email)
 Email verification flow: as extra step after user sign-up. Should not block user signup process for better conversion.

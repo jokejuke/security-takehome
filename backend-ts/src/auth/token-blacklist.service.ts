@@ -21,14 +21,21 @@ export class TokenBlacklistService implements OnModuleInit, OnModuleDestroy {
     await this.redis.quit();
   }
 
-  async addToken(token: string, expiryTimestampMs: number): Promise<void> {
+  /**
+   * Blacklist a token by its RFC 7519 `jti` claim.
+   * TTL is set to the token's remaining lifetime so Redis auto-expires the entry.
+   */
+  async addToken(jti: string, expiryTimestampMs: number): Promise<void> {
     const ttlSeconds = Math.ceil((expiryTimestampMs - Date.now()) / 1000);
     if (ttlSeconds <= 0) return; // already expired, no need to store
-    await this.redis.set(`blacklist:${token}`, '1', 'EX', ttlSeconds);
+    await this.redis.set(`blacklist:jti:${jti}`, '1', 'EX', ttlSeconds);
   }
 
-  async isBlacklisted(token: string): Promise<boolean> {
-    const result = await this.redis.exists(`blacklist:${token}`);
+  /**
+   * Returns true if the given `jti` has been revoked.
+   */
+  async isBlacklisted(jti: string): Promise<boolean> {
+    const result = await this.redis.exists(`blacklist:jti:${jti}`);
     return result === 1;
   }
 }

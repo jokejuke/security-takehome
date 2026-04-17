@@ -43,7 +43,7 @@ Extend the system to support:
 - Clear access control enforcement
 - Reasonable handling of edge cases
 - Clean, understandable code
-- Short design write up
+- Short design write up 
 
 ### Time expectation
 - Please spend **2-4 hours maximum** on this assignment
@@ -142,33 +142,3 @@ Example `POST /bio-pages` payload:
   ]
 }
 ```
-
-
-# Log
-Multi-env Docker containers for CI/CD (dev/test/prod).
-RS256 JWT auth with asymmetric keys and configurable expiry.
-Pagination with parameterized queries; SQL injection prevention.
-Handle-based auth with SOC2 password policy (12+ chars, complexity).
-Field-level sharing permissions (bio, displayName, links).
-Soft-delete + Redis token blacklist replacing refresh tokens.
-Account deletion with confirmation (SOC2 compliance).
-Exponential login backoff with Redis state tracking.
-
-# TODO
-
-## High Security Priority
-Move token from session storage to http-only cookie.
-Add audit log for all sharing and user update actions done via sharing functionality and delete actions
-Request rate limiting
-Protected bio attributes (e.g. email)
-Email verification flow: as extra step after user sign-up. Should not block user signup process for better conversion.
-
-## Medium Priority
-Refresh-tokens
-Permanent deletion workflow
-Admin / Recuiter Roles
-Recuiter see CVs of all users (with no Sharing table involved)
-
-## Lower Priority / Data Integrity
-UNIQUE constraint on sharing (owner_handle, shared_handle)
-Search by handle

@@ -64,21 +64,28 @@ export class AuthService {
     const bioPageId = randomUUID();
     const now = new Date().toISOString();
 
-    this.database.exec(
-      `INSERT INTO users (id, handle, password_hash, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5);`,
-      [userId, dto.handle, passwordHash, now, now],
-    );
+    this.database.exec('BEGIN TRANSACTION;');
+    try {
+      this.database.exec(
+        `INSERT INTO users (id, handle, password_hash, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5);`,
+        [userId, dto.handle, passwordHash, now, now],
+      );
 
-    const displayName = dto.displayName || dto.handle;
-    const bio = dto.bio || '';
-    const linksJson = JSON.stringify(dto.links || []);
+      const displayName = dto.displayName || dto.handle;
+      const bio = dto.bio || '';
+      const linksJson = JSON.stringify(dto.links || []);
 
-    this.database.exec(
-      `INSERT INTO bio_pages (id, user_id, handle, display_name, bio, links_json, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
-      [bioPageId, userId, dto.handle, displayName, bio, linksJson, now, now],
-    );
+      this.database.exec(
+        `INSERT INTO bio_pages (id, user_id, handle, display_name, bio, links_json, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+        [bioPageId, userId, dto.handle, displayName, bio, linksJson, now, now],
+      );
+      this.database.exec('COMMIT;');
+    } catch (error) {
+      this.database.exec('ROLLBACK;');
+      throw error;
+    }
 
     return { userId };
   }
@@ -114,54 +121,129 @@ export class AuthService {
     }
 
     await this.loginThrottle.clearFailures(dto.handle);
-    return this.generateToken({ id: user.id, handle: user.handle });
+    return this.generateTokens({ id: user.id, handle: user.handle });
   }
 
-
-  async signOut(accessToken: string): Promise<void> {
+  /**
+   * RFC 6749 §6 — Refresh an access token using a valid refresh token.
+   * Implements refresh token rotation: the supplied refresh token is
+   * immediately revoked and a fresh token pair is returned.
+   */
+  async refresh(refreshToken: string): Promise<AuthTokens> {
+    // 1. Verify signature and expiry
+    let payload: TokenPayload;
     try {
-      const payload = jwt.verify(accessToken, this.publicKey, {
+      payload = jwt.verify(refreshToken, this.publicKey, {
         algorithms: [this.config.jwt.algorithm],
       }) as TokenPayload;
-
-      if (payload.exp) {
-        await this.tokenBlacklist.addToken(accessToken, payload.exp * 1000);
-      }
     } catch {
-      // Token already invalid, nothing to blacklist
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // 2. Must carry type: 'refresh' — reject access tokens used as refresh tokens
+    if (payload.type !== 'refresh') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    // 3. Check revocation list (covers logout and prior rotation)
+    if (await this.tokenBlacklist.isBlacklisted(payload.jti)) {
+      throw new UnauthorizedException('Refresh token has been revoked');
+    }
+
+    // 4. Ensure user still exists and is active
+    const rows = this.database.query<UserRow>(
+      'SELECT id, handle, deleted_at FROM users WHERE id = $1;',
+      [payload.sub],
+    );
+    const user = rows[0];
+    if (!user || user.deleted_at) {
+      throw new UnauthorizedException('User not found or account deleted');
+    }
+
+    // 5. Rotate: revoke the consumed refresh token immediately (RFC 6749 §10.4)
+    if (payload.exp) {
+      await this.tokenBlacklist.addToken(payload.jti, payload.exp * 1000);
+    }
+
+    // 6. Issue fresh token pair
+    return this.generateTokens({ id: user.id, handle: user.handle });
+  }
+
+  /**
+   * Revoke the current session by blacklisting both the access token and,
+   * when provided, the refresh token.
+   */
+  async signOut(accessToken: string, refreshToken?: string): Promise<void> {
+    await this.revokeToken(accessToken);
+    if (refreshToken) {
+      await this.revokeToken(refreshToken);
     }
   }
 
   async verifyAccessToken(token: string): Promise<TokenPayload> {
-    if (await this.tokenBlacklist.isBlacklisted(token)) {
+    let payload: TokenPayload;
+    try {
+      payload = jwt.verify(token, this.publicKey, {
+        algorithms: [this.config.jwt.algorithm],
+      }) as TokenPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    if (payload.type !== 'access') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    if (await this.tokenBlacklist.isBlacklisted(payload.jti)) {
       throw new UnauthorizedException('Token has been revoked');
     }
 
-    try {
-      const payload = jwt.verify(token, this.publicKey, {
-        algorithms: [this.config.jwt.algorithm],
-      }) as TokenPayload;
-
-      if (payload.type !== 'access') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      return payload;
-    } catch (err) {
-      if (err instanceof UnauthorizedException) throw err;
-      throw new UnauthorizedException('Invalid access token');
-    }
+    return payload;
   }
 
   getPublicKey(): string {
     return this.publicKey;
   }
 
-  private generateToken(user: { id: string; handle: string }): AuthTokens {
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Verify a token's signature and blacklist it by its `jti`.
+   * Silently ignores already-expired or malformed tokens.
+   */
+  private async revokeToken(token: string): Promise<void> {
+    try {
+      const payload = jwt.verify(token, this.publicKey, {
+        algorithms: [this.config.jwt.algorithm],
+      }) as TokenPayload;
+
+      if (payload.jti && payload.exp) {
+        await this.tokenBlacklist.addToken(payload.jti, payload.exp * 1000);
+      }
+    } catch {
+      // Token already invalid — nothing to blacklist
+    }
+  }
+
+  /**
+   * Issue an access + refresh token pair (RFC 6749 §5.1).
+   * Both tokens carry a unique `jti` (RFC 7519 §4.1.7) for per-token revocation.
+   */
+  private generateTokens(user: { id: string; handle: string }): AuthTokens {
     const accessPayload: TokenPayload = {
       sub: user.id,
       handle: user.handle,
       type: 'access',
+      jti: randomUUID(),
+    };
+
+    const refreshPayload: TokenPayload = {
+      sub: user.id,
+      handle: user.handle,
+      type: 'refresh',
+      jti: randomUUID(),
     };
 
     const accessToken = jwt.sign(accessPayload, this.privateKey, {
@@ -169,10 +251,16 @@ export class AuthService {
       expiresIn: this.config.jwt.accessTokenExpiresIn as jwt.SignOptions['expiresIn'],
     });
 
+    const refreshToken = jwt.sign(refreshPayload, this.privateKey, {
+      algorithm: this.config.jwt.algorithm,
+      expiresIn: this.config.jwt.refreshTokenExpiresIn as jwt.SignOptions['expiresIn'],
+    });
+
     return {
       accessToken,
-      expiresIn: this.config.jwt.accessTokenExpiresIn,
+      accessExpiresIn: this.config.jwt.accessTokenExpiresIn,
+      refreshToken,
+      refreshExpiresIn: this.config.jwt.refreshTokenExpiresIn,
     };
   }
-
 }

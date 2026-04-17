@@ -8,7 +8,7 @@
   },
   "jwt": {
     "accessTokenExpiresIn": "1h",
-    "refreshTokenExpiresIn": "7d",
+    "refreshTokenExpiresIn": "4d",
     "algorithm": "RS256"
   }
 }
